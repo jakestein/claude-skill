@@ -56,6 +56,10 @@ The token is saved locally to `~/.claude/cp-api-token` with `600` permissions (r
 - Tokens are never displayed in chat output or passed as literal command-line arguments
 - User inputs are sanitized before being used in API queries
 
+## Known issues
+
+- API tokens are scoped to an organization in your Common Paper account. If you can't retrieve agreements you expect to see, it's likely you were the recipient of that agreement and it's owned by another organization. We only have API support for agreements sent by the organization associated with the API token.
+
 ## License
 
 MIT
