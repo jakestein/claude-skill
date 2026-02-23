@@ -24,7 +24,7 @@ The API uses Bearer token authentication. Only an API token is required — the 
 Before making any API call, check if a saved token exists:
 
 ```bash
-cat ~/.claude/cp-api-token 2>/dev/null
+cat ~/.claude/skills/commonpaper/cp-api-token 2>/dev/null
 ```
 
 If the file exists and is non-empty, use its contents as the token. **Do not echo or display the value to the user.**
@@ -37,12 +37,12 @@ If the file does not exist or is empty, ask the user:
 
 Before saving or using the token, validate it:
 
-- Must start with `zpka_` and contain only alphanumeric characters and underscores
+- Must contain only alphanumeric characters and underscores
 
 After receiving and validating the token, test it with a lightweight API call:
 
 ```bash
-curl -s -H "Authorization: Bearer $(cat ~/.claude/cp-api-token)" "https://api.commonpaper.com/v1/agreements?page%5Bsize%5D=1" -o /dev/null -w "%{http_code}"
+curl -s -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-token)" "https://api.commonpaper.com/v1/agreements?page%5Bsize%5D=1" -o /dev/null -w "%{http_code}"
 ```
 
 If the response is not `200`, inform the user that their token appears invalid and ask them to double-check.
@@ -54,7 +54,7 @@ After successful validation, ask: "Would you like me to save this token for futu
 If yes:
 
 ```bash
-echo -n "THE_TOKEN" > ~/.claude/cp-api-token && chmod 600 ~/.claude/cp-api-token
+echo -n "THE_TOKEN" > ~/.claude/skills/commonpaper/cp-api-token && chmod 600 ~/.claude/skills/commonpaper/cp-api-token
 ```
 
 ### Making Requests
@@ -62,7 +62,7 @@ echo -n "THE_TOKEN" > ~/.claude/cp-api-token && chmod 600 ~/.claude/cp-api-token
 **All API requests MUST read the token from the credentials file via command substitution to avoid exposing it as a literal in the command.**
 
 ```bash
-curl -s -H "Authorization: Bearer $(cat ~/.claude/cp-api-token)" \
+curl -s -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-token)" \
   "https://api.commonpaper.com/v1/agreements"
 ```
 
@@ -75,7 +75,7 @@ For POST/PATCH requests, add:
 
 **IMPORTANT — URL encoding**: Always URL-encode square brackets in query parameters. Use `%5B` for `[` and `%5D` for `]`. Unencoded brackets will cause `zsh: no such file or directory` errors.
 
-**Note**: While `$(cat ~/.claude/cp-api-token)` is expanded by the shell before execution (so the token briefly appears in the process list), this is significantly better than having the literal token in the command text shown in chat. The token file is also chmod 600 so only the user can read it.
+**Note**: While `$(cat ~/.claude/skills/commonpaper/cp-api-token)` is expanded by the shell before execution (so the token briefly appears in the process list), this is significantly better than having the literal token in the command text shown in chat. The token file is also chmod 600 so only the user can read it.
 
 ## Endpoints
 
@@ -283,7 +283,7 @@ Use `page[number]=N&page[size]=M` query params (URL-encoded: `page%5Bnumber%5D=N
 
 ## Common Query Patterns
 
-In all examples below, `$AUTH` refers to `-H "Authorization: Bearer $(cat ~/.claude/cp-api-token)"`.
+In all examples below, `$AUTH` refers to `-H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-token)"`.
 
 ### "How many signed contracts do I have?"
 
@@ -362,7 +362,7 @@ To create and send an agreement:
 4. **POST to `/v1/agreements`**:
 
 ```bash
-curl -s -H "Authorization: Bearer $(cat ~/.claude/cp-api-token)" \
+curl -s -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-token)" \
   -H "Content-Type: application/json" \
   -d '{
     "owner_email": "owner@company.com",

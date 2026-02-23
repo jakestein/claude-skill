@@ -17,11 +17,10 @@ Supports all Common Paper agreement types: NDA, CSA, DPA, PSA, Partnership, BAA,
 
 ## Installation
 
-1. Copy the `commonpaper` folder into your Claude Code skills directory:
+1. Clone this repo into your Claude Code skills directory:
 
 ```bash
-mkdir -p ~/.claude/skills
-cp -r commonpaper ~/.claude/skills/
+git clone https://github.com/CommonPaper/claude-skill.git ~/.claude/skills/commonpaper
 ```
 
 2. Add the skill to your `~/.claude/settings.json`:
@@ -42,7 +41,7 @@ cp -r commonpaper ~/.claude/skills/
 
 On first use, Claude will ask for your Common Paper API token. You can generate one from your account's **Integrations** tab at [app.commonpaper.com](https://app.commonpaper.com).
 
-The token is saved locally to `~/.claude/cp-api-token` with `600` permissions (readable only by you). It is never displayed in chat output.
+The token is saved locally to `~/.claude/skills/commonpaper/cp-api-token` with `600` permissions (readable only by you). It is never displayed in chat output.
 
 ## Requirements
 
