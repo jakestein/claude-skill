@@ -139,6 +139,34 @@ POST /v1/agreements
 - `agreement.sender_signer_name`, `agreement.sender_signer_title`, `agreement.sender_signer_email`
 - `agreement.recipient_organization`, `agreement.recipient_title`
 - `agreement.agreement_type` — NDA, CSA, etc.
+- `agreement.test_agreement` — set to `true` to send a test agreement
+
+**Billing fields:**
+- `agreement.include_billing_workflow` — set to `true` to enable a billing workflow after signing
+- `agreement.billing_workflow_type` — `"link"` or `"stripe"`
+- `agreement.payment_link_url` — payment URL shown after signing; requires `include_billing_workflow: true` and `billing_workflow_type: "link"`
+- `agreement.include_automated_payment_reminders` — boolean; sends automatic payment reminders when true
+- `agreement.include_billing_info` — boolean; enables billing contact fields
+- `agreement.billing_name` — billing contact name; used when `include_billing_info` is true
+- `agreement.billing_email` — billing contact email; used when `include_billing_info` is true
+
+**Governing law fields:**
+- `agreement.governing_law_country` — country whose laws govern the agreement (e.g., `"United States of America"`)
+- `agreement.governing_law_region` — state or region whose laws govern the agreement (e.g., `"Delaware"`)
+- `agreement.chosen_courts_country` — country where disputes will be resolved
+- `agreement.chosen_courts_region` — state or region where disputes will be resolved
+- `agreement.district_or_county` — district or county for dispute resolution
+
+**Notice email fields:**
+- `agreement.sender_notice_email_address` — email for legal notices to the sender
+- `agreement.recipient_notice_email_address` — email for legal notices to the recipient
+
+**Framework terms fields:**
+- `agreement.framework_terms_type` — `"new"` (standard) or `"description"` (custom)
+- `agreement.framework_terms_description` — custom framework terms; only used when `framework_terms_type` is `"description"`
+
+**Other fields:**
+- `agreement.manual_send` — set to `true` to mark the agreement as manually sent outside the platform
 
 ### Agreement Actions
 
