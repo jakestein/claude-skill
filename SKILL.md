@@ -152,7 +152,10 @@ POST /v1/agreements
 
 **Governing law fields:**
 - `agreement.governing_law_country` — country whose laws govern the agreement (e.g., `"United States of America"`)
+- `agreement.governing_law_region` — state or region whose laws govern the agreement (e.g., `"Delaware"`)
 - `agreement.chosen_courts_country` — country where disputes will be resolved
+- `agreement.chosen_courts_region` — state or region where disputes will be resolved
+- `agreement.district_or_county` — district or county for dispute resolution
 
 **Notice email fields:**
 - `agreement.sender_notice_email_address` — email for legal notices to the sender
