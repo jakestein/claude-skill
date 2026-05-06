@@ -118,6 +118,7 @@ POST /v1/agreements
 {
   "owner_email": "owner@company.com",
   "template_id": "uuid-of-template",
+  "draft": false,
   "agreement": {
     "agreement_type": "NDA",
     "sender_signer_name": "Jane Smith",
@@ -134,6 +135,9 @@ POST /v1/agreements
 - `template_id` — UUID of the template to use (get from `GET /v1/templates`)
 - `agreement.recipient_email` — recipient's email address
 - `agreement.recipient_name` — recipient's name (REQUIRED — will error without it)
+
+**Top-level options:**
+- `draft` — boolean (top-level, NOT nested under `agreement`). When `true`, the agreement is created with status `draft` and is **not** sent to the recipient. Send it later via `POST /v1/agreements/{id}/send`. When `false` or omitted, the agreement is created and sent immediately.
 
 **Optional but recommended fields:**
 - `agreement.sender_signer_name`, `agreement.sender_signer_title`, `agreement.sender_signer_email`
@@ -172,6 +176,7 @@ POST /v1/agreements
 ### Agreement Actions
 
 ```
+POST  /v1/agreements/{id}/send          — Send a draft agreement to the recipient
 PATCH /v1/agreements/{id}/void          — Void an agreement
 PATCH /v1/agreements/{id}/reassign      — Reassign recipient
 PATCH /v1/agreements/{id}/resend_email  — Resend signature email
@@ -179,6 +184,8 @@ GET   /v1/agreements/{id}/history       — Get agreement history
 GET   /v1/agreements/{id}/download_pdf  — Download PDF
 GET   /v1/agreements/{id}/shareable_link — Get shareable link
 ```
+
+**Send**: Only works on agreements in `draft` status (returns 422 otherwise). No request body required.
 
 ### Templates
 
@@ -239,7 +246,9 @@ All other fields in the request body are optional and set the defaults pre-fille
 - `purpose` — purpose statement (default: "Evaluating whether to enter into a business relationship…")
 - `include_terms` — boolean; include standard CP terms on the agreement
 
-**CSA-specific parameters:**
+**CSA versions**: Common Paper has two major CSA versions. The API defaults to the latest (currently v2.1). Pass `standard_version: "1.0"` or `"2.0"` to override. Most new accounts should use v2.
+
+**CSA-specific parameters (both versions):**
 - `general_cap_amount_type` — `"preceding"` (multiple of fees paid), `"qty"` (fixed dollar amount), or `"unlimited"`
 - `general_cap_preceding_amount` — multiplier if type is `"preceding"` (e.g., `"1.0"` = 1× fees)
 - `general_cap_amount` — fixed cap if type is `"qty"` (dollar amount as string)
@@ -248,52 +257,90 @@ All other fields in the request body are optional and set the defaults pre-fille
 - `include_covered_claims_provider_claims` — text of provider IP indemnification
 - `include_covered_claims_include_customer_claims` — boolean
 - `include_covered_claims_customer_claims` — text of customer claims
-- `include_increased_cap_amount` — boolean; include an elevated cap tier
-- `increased_cap_amount_type` — `"qty"` or other
-- `increased_cap_amount_qty` — multiplier for increased cap
+- `include_increased_cap_amount` — boolean
 - `include_increased_claims` — boolean
 - `include_increased_claims_breach_of_privsec` — boolean
 - `include_increased_claims_breach_of_confidentiality` — boolean
-- `include_unlimited_claims` — boolean; include unlimited liability claims
+- `include_unlimited_claims` — boolean
 - `include_unlimited_claims_indemnification_obligation` — boolean
 - `include_unlimited_claims_breach_of_confidentiality` — boolean
-- `include_security_policy` — boolean; include security policy addendum
+- `include_security_policy` — boolean
 - `include_security_policy_include_reasonable_efforts` — boolean
 - `include_security_policy_soc2` — boolean
 - `include_security_policy_soc2_type2` — boolean
 - `include_security_policy_iso27001` — boolean
-- `include_security_policy_hipaa` — boolean
 - `include_security_policy_penetration_testing` — boolean
 - `include_acceptable_use_policy` — boolean
-- `include_dpa` — boolean; include DPA addendum
-- `include_ai_addendum` — boolean; include AI addendum
 - `include_additional_warranties` — boolean
 - `include_insurance_minimums` — boolean
 - `include_insurance_minimums_include_general_liability` — boolean
-- `include_insurance_minimums_general_liability_minimum` — minimum coverage (string, e.g., `"1000000.0"`)
-- `include_insurance_minimums_general_liability_aggregate` — aggregate coverage (string)
+- `include_insurance_minimums_general_liability_minimum` — string, e.g. `"1000000.0"`
+- `include_insurance_minimums_general_liability_aggregate` — string
 - `include_publicity_rights` — boolean
-- `include_billing_workflow` — boolean; enable billing after signing
+- `include_billing_workflow` — boolean
 - `billing_workflow_type` — `"stripe"` or `"link"`
-- `template_csa_order_form_attributes` — nested object with order form defaults:
-  - `cloud_service_description` — **required for CSA** — description of the cloud service
-  - `subscription_period` — integer (default: 1)
-  - `subscription_period_unit` — `"year(s)"` or `"month(s)"`
-  - `subscription_auto_renew` — `"days"` (rolling) or `"no"` (no auto-renew)
-  - `subscription_renewal_notice_days` — integer (default: 30)
-  - `fee_amount` — default fee as string (e.g., `"20000.0"`)
-  - `fee_period` — `"year"` or `"month"`
-  - `payment_period` — integer days until payment due (e.g., 30)
-  - `payment_period_unit` — `"day(s)"` 
-  - `invoice_period` — `"annually"` or `"monthly"`
-  - `affiliates_as_users` — boolean
-  - `include_sla` — boolean
-  - `include_product_support` — boolean
-  - `include_professional_services` — boolean
-  - `include_free_trial` — boolean
-  - `free_trial_days` — integer
-  - `include_max_users` — boolean
-  - `max_users` — integer
+
+**v1-only CSA parameters:**
+- `include_security_policy_hipaa` — boolean (v1 only; use BAA template for HIPAA compliance in v2)
+
+**v2-only CSA parameters:**
+- `include_security_policy_hitrust` — boolean
+- `include_ai_addendum` — boolean; requires `include_ai_addendum_attachment_id` (upload PDF first)
+- `include_ai_addendum_attachment_id` — UUID from `POST /v1/attachments`
+- `framework_terms_type` — **required for v2** — `"new"` (standard CP terms) or `"description"` (custom)
+- `include_dpa` — boolean; include DPA addendum (v2 only; requires `include_dpa_type`)
+- `include_dpa_type` — `"description"` (inline text) or `"attachment"` (requires `include_dpa_attachment_id`)
+
+**CSA order form (`template_csa_order_form_attributes`):**
+
+- `cloud_service_description` — **required** — description of the cloud service
+- `subscription_period` — integer (default: 1)
+- `subscription_period_unit` — `"year(s)"` or `"month(s)"`
+- `subscription_auto_renew` — `"days"` (rolling) or `"no"`
+- `subscription_renewal_notice_days` — integer (default: 30)
+- `include_sla` — boolean
+- `include_product_support` — boolean
+- `include_professional_services` — boolean
+- `include_free_trial` — boolean
+- `free_trial_days` — integer
+- `include_max_users` — boolean
+- `max_users` — integer
+- `fees_currency` — `"USD"` (default)
+- `fees_inclusive_of_taxes` — boolean
+- `fees_include_fee_increase_upon_renewal` — boolean
+- `fees_include_fee_increase_upon_renewal_fee` — percentage as decimal (e.g., `"5.0"` = 5%)
+
+**v1 order form payment fields:**
+- `payment_period` — integer days until payment due (e.g., 30)
+- `payment_period_unit` — `"day(s)"`
+- `invoice_period` — `"annually"` or `"monthly"`
+- `affiliates_as_users` — boolean
+
+**v2 order form payment fields:**
+- `payment_process_type` — **required for v2** — `"automatic"` (Stripe recurring), `"invoice"`, or `"custom"`
+- `payment_process_automatic_frequency` — required if `payment_process_type` is `"automatic"` (e.g., `"monthly"`, `"annually"`)
+- `payment_process_type_invoice_type` — required if type is `"invoice"`
+- `payment_process_type_invoice_duration` — duration period
+- `include_pilot_period` — boolean; enable a pilot/trial period before full subscription
+- `include_pilot_period_duration_amount` — integer
+- `include_pilot_period_duration_type` — e.g., `"day(s)"`, `"month(s)"`
+- `include_pilot_period_include_fees` — boolean; whether pilot period has fees
+
+**CSA fees (v2)**: v2 CSAs support structured fee line items as an array under `fees_attributes`. Each fee has a `type` field:
+
+| Fee type | Description |
+|---|---|
+| `Fees::Flat` | Fixed total amount (`cost`) |
+| `Fees::Cost` | Per-unit pricing (`cost` × `quantity`) |
+| `Fees::Metered` | Usage-based (`cost`) |
+| `Fees::OneTime` | One-time non-recurring charge |
+| `Fees::Discount` | Discount line item (`discount_type`: `"fixed_amount"` or `"percentage"`) |
+| `Fees::Graduated` | Tiered pricing with tiers |
+| `Fees::Included` | Included at no charge |
+| `Fees::Text` | Free-form text description only |
+| `Fees::Attachment` | Fee defined via uploaded PDF attachment |
+
+Common fee fields: `description`, `cost` (decimal as string), `quantity` (integer), `stripe_product_id`.
 
 **PSA-specific parameters:**
 - `template_psa_statement_of_work_attributes` — nested object with PSA defaults
@@ -404,12 +451,18 @@ The response includes the attachment ID, which can then be referenced in templat
 ### Other Endpoints
 
 ```
-GET /v1/users              — List organization users
-GET /v1/users/{id}         — Get single user
-GET /v1/agreement_types    — List all agreement types
-GET /v1/agreement_statuses — List all agreement statuses
-GET /v1/agreement_history  — List agreement histories (filterable)
+GET /v1/organizations       — List organizations (returns the caller's org)
+GET /v1/organizations/{id}  — Get single organization
+GET /v1/users               — List organization users
+GET /v1/users/{id}          — Get single user
+GET /v1/agreement_types     — List all agreement types
+GET /v1/agreement_statuses  — List all agreement statuses
+GET /v1/agreement_history   — List agreement histories (filterable)
 ```
+
+### Organizations
+
+The token is scoped to a single organization. `GET /v1/organizations` returns that org as a single-element list. Useful attributes include `name` (the company name), `street_address`, `city`, `state`, `zipcode`, `country`, and `onboarded`. Use this endpoint to fetch the company name rather than asking the user for it.
 
 ### Users
 
@@ -584,7 +637,7 @@ Present results as a table with columns: Agreement Type, Counterparty, End Date,
 
 - **400 Bad Request**: Check the request body schema — the create endpoint uses a specific format (see Create Agreement above), not JSONAPI.
 - **401 Unauthorized**: Token is invalid or expired. Ask the user to check their API token.
-- **403 Forbidden**: Token may not have the required permissions.
+- **403 Forbidden** / "You've reached your plan limit": On a new account this almost always means the user's **email is not verified** rather than an actual plan limit. Check `email_verified` on `GET /v1/users` and tell the user to verify their email before trying again. Test agreements bypass plan limits but still require a verified email.
 - **404 Not Found**: The agreement or resource doesn't exist.
 - **422 Unprocessable Entity**: Invalid filter or request body. Check the filter syntax.
 
@@ -637,7 +690,22 @@ curl -s -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-toke
   "https://api.commonpaper.com/v1/agreements"
 ```
 
-The agreement will be created and sent immediately. The response includes the agreement URL in `data.links.agreement_url`.
+By default the agreement is **sent immediately** to the recipient. Always confirm with the user before creating, and be explicit that the agreement will be sent right away. If the user wants to review the generated agreement before it goes out, pass `draft: true` (top-level) — the agreement is created in `draft` status and won't be sent until you `POST /v1/agreements/{id}/send`.
+
+The response includes the agreement URL in `data.links.agreement_url`.
+
+### Send Draft Agreement
+
+```
+POST /v1/agreements/{id}/send
+```
+
+Sends a previously created draft. The agreement must be in `draft` status — sending an already-sent agreement returns 422. No request body needed.
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-token)" \
+  "https://api.commonpaper.com/v1/agreements/{id}/send"
+```
 
 ### Void Agreement
 
@@ -672,27 +740,32 @@ Onboarding mode guides a brand-new user through setting up their entire Common P
 
 ### Phase 1: Account setup
 
-Confirm the API token is saved (standard credential flow). Then explain what onboarding will do: ask a few quick questions about their business, then create a sensible set of contract templates tailored to their answers.
+Confirm the API token is saved (standard credential flow). Then fetch the company name from `GET /v1/organizations` (`data[0].attributes.name`) — do not ask the user for it. Use this name to prefix template names in Phase 4. Then explain what onboarding will do: ask a few quick questions about their business, then create a sensible set of contract templates tailored to their answers.
 
-### Phase 2: Q&A — ask everything at once
+### Phase 2: Q&A — show all questions, answer one at a time
 
-Ask these questions in a single message. Keep it conversational and brief — the user should be able to answer in under 5 minutes. Do **not** ask about legal specifics; derive those from their answers.
+Display all questions upfront so the user can see the full scope, then ask them to answer one at a time starting with the first. This lets them see how much work is involved without requiring a single long response.
+
+Keep it conversational and brief — the user should be able to answer in under 5 minutes. Do **not** ask about legal specifics; derive those from their answers.
 
 ```
-A few questions to get your account set up:
+Here's what I'll need to know to set up your templates. I'll ask you one at a time — let's start with the first:
 
-1. What's your company name?
-2. What does your product or service do? (1–2 sentences)
-3. What state's law do you want governing your agreements? (This is a legal preference, not necessarily where you operate)
-4. What's the email of the person who will typically send and sign agreements? (Must be an existing user in your Common Paper account — probably the email you signed up with)
-5. Do you sell software as a service (SaaS), on-premise/embedded software, or both?
-6. Do you offer professional services? (implementation, consulting, custom dev)
-7. Do you have a free trial or pilot program?
-8. Do any of your customers work in healthcare, or does your product process health records?
-9. Do you have customers in Europe, or does your product process personal data from EU residents?
-10. Does your product use AI or machine learning in a way that's visible to your customers?
-11. Do you have security certifications? (e.g., SOC 2, ISO 27001, HITRUST — or none yet)
+1. What does your product or service do? (1–2 sentences)
+2. What state's law do you want governing your agreements? (This is a legal preference, not necessarily where you operate)
+3. What's the email of the person who will typically send and sign agreements? (Must be an existing user in your Common Paper account — probably the email you signed up with)
+4. Do you sell software as a service (SaaS), on-premise/embedded software, or both?
+5. Do you offer professional services? (implementation, consulting, custom dev)
+6. Do you have a free trial or pilot program?
+7. Do any of your customers work in healthcare, or does your product process health records?
+8. Do you have customers in Europe, or does your product process personal data from EU residents?
+9. Does your product use AI or machine learning in a way that's visible to your customers?
+10. Do you have security certifications? (e.g., SOC 2, ISO 27001, HITRUST — or none yet)
+
+I have your company name from your Common Paper account already — let's start with the first question: what does your product or service do?
 ```
+
+After each answer, acknowledge it briefly and ask the next question. Once all answers are collected, move to Phase 3.
 
 ### Phase 3: Interpret answers and propose a plan
 
@@ -727,13 +800,13 @@ Based on the user's answers, decide which templates to create and what key setti
 - **Security policy on CSA**: Enable `include_security_policy: true` if they have any certifications. Set the relevant cert flags based on what they listed: `include_security_policy_soc2`, `include_security_policy_soc2_type2`, `include_security_policy_iso27001`, `include_security_policy_hitrust`, `include_security_policy_penetration_testing`, etc. Note: HITRUST is a certification framework; HIPAA is a regulatory requirement — treat them separately.
 - **Payment terms**: Default to net-30 (30 days), annual invoicing. Adjust to monthly if they mentioned monthly billing.
 - **Free trial**: Enable on CSA order form if they said yes.
-- **Default signer email**: Use the email from question 3 on all templates.
+- **Default signer email**: Use the email from question 3 (signer) on all templates.
 - **Negotiations**: Default to `true` (allowed) for all types except DPA and BAA, which default to `false`.
 
-**Before creating anything**, present the plan to the user like this:
+**Before creating anything**, present the plan clearly and wait for explicit confirmation. Do not proceed until the user says yes — a Cowork user may be watching without having initiated the request themselves.
 
 ```
-Based on your answers, here's what I'll create:
+Based on your answers, here's what I'm going to create in your Common Paper account:
 
 Templates:
 - ✓ NDA — mutual, 1-year term, 2-year confidentiality, [State] law
@@ -748,10 +821,10 @@ Key settings applied to all:
 - Default signer: [email]
 - Negotiations allowed: [yes/no per type]
 
-Does this look right? Let me know if you'd like to skip any templates or change anything before I create them.
+Ready to create these — does this look right, or would you like to change anything first?
 ```
 
-Wait for the user to confirm or adjust before proceeding.
+**Do not create any templates until the user explicitly confirms.**
 
 ### Phase 4: Create the templates
 
@@ -770,13 +843,32 @@ Create templates one at a time and show progress as each is created. Report each
 
 ### Phase 5: Wrap-up
 
-After all templates are created, show a summary table:
+After all templates are created, show a summary table with direct links to each template in the app. Template app URLs follow this pattern based on type:
 
-| Template | ID | Status |
+| Response type | App URL path |
+|---|---|
+| `template_nda` | `/organizations/{org_id}/nda/{id}` |
+| `template_csa` | `/organizations/{org_id}/csa/{id}` |
+| `template_dpa` | `/organizations/{org_id}/dpa/{id}` |
+| `template_psa` | `/organizations/{org_id}/psa/{id}` |
+| `template_baa` | `/organizations/{org_id}/baa/{id}` |
+| `template_loi` | `/organizations/{org_id}/loi/{id}` |
+| `template_pilot` | `/organizations/{org_id}/pilot/{id}` |
+| `template_design` | `/organizations/{org_id}/design/{id}` |
+| `template_partnership` | `/organizations/{org_id}/partnership/{id}` |
+| `template_software_license` | `/organizations/{org_id}/software_license/{id}` |
+
+Base URL: `https://app.commonpaper.com`
+
+Present the summary like this:
+
+| Template | Link | Status |
 |---|---|---|
-| NDA | `uuid` | ✓ Created |
-| CSA | `uuid` | ✓ Created |
+| NDA | https://app.commonpaper.com/organizations/{org_id}/nda/{id} | ✓ Created |
+| CSA | https://app.commonpaper.com/organizations/{org_id}/csa/{id} | ✓ Created |
 | ... | ... | ... |
+
+**Template naming**: Prefix with the company name fetched from `GET /v1/organizations` in Phase 1, e.g., "Acme Corp NDA" or "Acme Corp Cloud Service Agreement".
 
 Then display what **cannot be done via the API** and must be completed manually:
 
