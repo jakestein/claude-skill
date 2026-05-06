@@ -139,6 +139,8 @@ POST /v1/agreements
 **Top-level options:**
 - `draft` — boolean (top-level, NOT nested under `agreement`). When `true`, the agreement is created with status `draft` and is **not** sent to the recipient. Send it later via `POST /v1/agreements/{id}/send`. When `false` or omitted, the agreement is created and sent immediately.
 
+**Default to draft mode.** When creating an agreement on the user's behalf, always pass `draft: true` unless the user explicitly says to send it right away. Then tell the user the draft was created, give them the agreement URL to review, and ask whether to send it. Only call `POST /v1/agreements/{id}/send` after they confirm.
+
 **Optional but recommended fields:**
 - `agreement.sender_signer_name`, `agreement.sender_signer_title`, `agreement.sender_signer_email`
 - `agreement.recipient_organization`, `agreement.recipient_title`
@@ -665,12 +667,12 @@ To update an existing template:
 
 ### Create Agreement
 
-To create and send an agreement:
+To create an agreement:
 
 1. **Look up the sender** using `GET /v1/users` to get their name, title, and email
 2. **Look up the template** using `GET /v1/templates` and find the one matching the desired type (e.g., `type == "template_nda"`)
-3. **Confirm details** with the user before sending
-4. **POST to `/v1/agreements`**:
+3. **Confirm details** with the user — be explicit about what you're going to do before you do it (a Cowork user may be watching without having initiated the request)
+4. **POST to `/v1/agreements`** with `draft: true` by default:
 
 ```bash
 curl -s -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-token)" \
@@ -678,6 +680,7 @@ curl -s -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-toke
   -d '{
     "owner_email": "owner@company.com",
     "template_id": "uuid-of-template",
+    "draft": true,
     "agreement": {
       "agreement_type": "NDA",
       "sender_signer_name": "Jane Smith",
@@ -690,9 +693,10 @@ curl -s -H "Authorization: Bearer $(cat ~/.claude/skills/commonpaper/cp-api-toke
   "https://api.commonpaper.com/v1/agreements"
 ```
 
-By default the agreement is **sent immediately** to the recipient. Always confirm with the user before creating, and be explicit that the agreement will be sent right away. If the user wants to review the generated agreement before it goes out, pass `draft: true` (top-level) — the agreement is created in `draft` status and won't be sent until you `POST /v1/agreements/{id}/send`.
+5. **Show the user the draft URL** (`data.links.agreement_url`) and ask whether to send it
+6. **If they confirm, send it** via `POST /v1/agreements/{id}/send`
 
-The response includes the agreement URL in `data.links.agreement_url`.
+**Always default to `draft: true`.** Only set `draft: false` (or omit it) if the user has explicitly said to send the agreement immediately without review. When sending immediately, restate that the email will go out right away before posting.
 
 ### Send Draft Agreement
 
