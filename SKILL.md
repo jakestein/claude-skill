@@ -321,12 +321,15 @@ All other fields in the request body are optional and set the defaults pre-fille
 **v2 order form payment fields:**
 - `payment_process_type` — **required for v2** — `"automatic"` (Stripe recurring), `"invoice"`, or `"custom"`
 - `payment_process_automatic_frequency` — required if `payment_process_type` is `"automatic"` (e.g., `"monthly"`, `"annually"`)
-- `payment_process_type_invoice_type` — required if type is `"invoice"`
-- `payment_process_type_invoice_duration` — duration period
+- `payment_process_type_invoice_type` — billing frequency, required if type is `"invoice"` (e.g., `"annually"`, `"monthly"`)
+- `payment_process_type_invoice_amount` — net-X count (integer), required if type is `"invoice"` (e.g., `30` for net-30)
+- `payment_process_type_invoice_duration` — net-X unit, required if type is `"invoice"` (e.g., `"day"`)
 - `include_pilot_period` — boolean; enable a pilot/trial period before full subscription
 - `include_pilot_period_duration_amount` — integer
 - `include_pilot_period_duration_type` — e.g., `"day(s)"`, `"month(s)"`
 - `include_pilot_period_include_fees` — boolean; whether pilot period has fees
+
+**Important**: when `payment_process_type` is `"invoice"`, you MUST set all of `payment_process_type_invoice_type`, `payment_process_type_invoice_amount`, and `payment_process_type_invoice_duration`. Missing the amount/duration crashes the agreement preview when the template is used (the presenter calls `pluralize(nil, nil)` and raises). For net-30 annual billing, that's `{ invoice_type: "annually", invoice_amount: 30, invoice_duration: "day" }`.
 
 **CSA fees (v2)**: v2 CSAs support structured fee line items as an array under `fees_attributes`. Each fee has a `type` field:
 
@@ -352,6 +355,14 @@ Common fee fields: `description`, `cost` (decimal as string), `quantity` (intege
 
 **Partnership-specific parameters:**
 - `template_partnership_business_terms_attributes` — nested object
+
+**Pilot-specific parameters:**
+- `product_description` — short description of the product being piloted (set this when creating, otherwise the template renders without context)
+- `pilot_period_description` — text describing the pilot period and its terms
+- `pilot_period_fees_description` — text used when the pilot has fees (paired with `fees_type`)
+- `fees_type` — `"free"` (default) or paid variants
+- `include_technical_support` — boolean
+- `technical_support_description` — text shown when support is included
 
 **Example: Create an NDA template**
 
@@ -756,11 +767,11 @@ Keep it conversational and brief — the user should be able to answer in under 
 Here's what I'll need to know to set up your templates. I'll ask you one at a time — let's start with the first:
 
 1. What does your product or service do? (1–2 sentences)
-2. What state's law do you want governing your agreements? (This is a legal preference, not necessarily where you operate)
+2. What state or country's law do you want governing your agreements? (This is a legal preference, not necessarily where you operate. Don't suggest a specific jurisdiction — let the user decide.)
 3. What's the email of the person who will typically send and sign agreements? (Must be an existing user in your Common Paper account — probably the email you signed up with)
 4. Do you sell software as a service (SaaS), on-premise/embedded software, or both?
 5. Do you offer professional services? (implementation, consulting, custom dev)
-6. Do you have a free trial or pilot program?
+6. Do you have a free trial or pilot program? (If yes, also ask: do you want this as a **standalone Pilot template**, **embedded in the CSA** as a pilot period before the subscription kicks in, or **both**?)
 7. Do any of your customers work in healthcare, or does your product process health records?
 8. Do you have customers in Europe, or does your product process personal data from EU residents?
 9. Does your product use AI or machine learning in a way that's visible to your customers?
@@ -789,7 +800,9 @@ Based on the user's answers, decide which templates to create and what key setti
 
 **Create Design Partner if:** they have a pilot or early-access program with design partners
 
-**Create Pilot if:** they have a free trial or paid pilot offering
+**Create Pilot template if:** they want a standalone pilot agreement (or "both"). When creating, set `product_description` to a one-line description of what's being piloted (derived from their answer to Q1). If they only want it embedded in the CSA, skip this template.
+
+**Embed pilot in CSA if:** they want it bundled with the subscription. Set `include_pilot_period: true`, `include_pilot_period_duration_amount`, `include_pilot_period_duration_type` (e.g., `"day(s)"`), and `include_pilot_period_include_fees: false` (unless they said the pilot has fees) on the CSA template.
 
 **Create Partnership if:** they work with resellers, referral partners, or co-sell partners
 
@@ -838,6 +851,9 @@ Before creating, verify the signer email against `GET /v1/users` to confirm it e
 - **CSA**: `template_csa_order_form_attributes.cloud_service_description`
 - **Software License**: `template_software_license_order_form_attributes.software_description`
 - **PSA**: `template_psa_statement_of_work_attributes.services_description`
+- **Pilot**: set `product_description` so the template has context
+
+**CSA invoice payment trap**: when v2 CSA uses `payment_process_type: "invoice"`, you must set all three of `payment_process_type_invoice_type`, `payment_process_type_invoice_amount`, and `payment_process_type_invoice_duration` inside `template_csa_order_form_attributes`. Missing the amount/duration will not error on template create but will crash with `pluralize(nil, nil)` the moment someone previews an agreement built from the template. For net-30 annual: `{ invoice_type: "annually", invoice_amount: 30, invoice_duration: "day" }`.
 
 **AI addendum**: requires uploading a PDF via `POST /v1/attachments` first, then setting `include_ai_addendum: true` and `include_ai_addendum_attachment_id` on the CSA template. Do not attempt to enable it without a valid attachment ID.
 
@@ -886,7 +902,7 @@ Then display what **cannot be done via the API** and must be completed manually:
 6. **Add your AI addendum** — If you have an AI addendum PDF, you can upload it via the skill and link it to your CSA template.
 7. **Preview each template** — Confirm the generated language looks correct before sending live agreements.
 
-**Want to test before going live?** When sending your first real agreement, consider setting `test_agreement: true`. It still sends a real email to the recipient and looks identical to a live agreement, but is marked as not legally binding and doesn't count against your monthly limit. Once you're confident everything looks right, send the live version.
+**Want to test before going live?** Set `test_agreement: true` on your first send. It sends a real email to the recipient and looks identical to a live agreement, but is marked as not legally binding and doesn't count against your monthly limit. Once you're confident everything looks right, send a live version (without `test_agreement`).
 
 Finally, always end onboarding with:
 
