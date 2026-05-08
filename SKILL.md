@@ -268,6 +268,7 @@ All other fields in the request body are optional and set the defaults pre-fille
 - `include_unlimited_claims_breach_of_confidentiality` — boolean
 - `include_security_policy` — boolean
 - `include_security_policy_include_reasonable_efforts` — boolean
+- `include_security_policy_include_annual_maintenance` — boolean; **must be set to `true` when enabling any certification flags below, or the certifications will not render on the agreement**
 - `include_security_policy_soc2` — boolean
 - `include_security_policy_soc2_type2` — boolean
 - `include_security_policy_iso27001` — boolean
@@ -792,9 +793,11 @@ Based on the user's answers, decide which templates to create and what key setti
 
 **Create Software License if:** they sell on-premise or embedded software
 
-**Create DPA if:** they have EU customers or process personal data on behalf of customers
+**Defer DPA to the wrap-up checklist** if they have EU customers or process personal data on behalf of customers. Do not create a DPA template during onboarding — the API alone can't capture the configuration these need (subprocessors, transfer mechanisms, attachment, etc.). Note in the plan that DPA setup needs a dedicated flow and add it to the post-onboarding checklist.
 
-**Create BAA if:** they mention healthcare customers or processing health records
+**Defer BAA to the wrap-up checklist** if they mention healthcare customers or processing health records. Same reason — BAA configuration is too thin via the API alone. Note in the plan and surface it in the post-onboarding checklist.
+
+**Scope of the deferral**: this only applies to the auto-onboarding flow, where defaults are inferred from a generic Q&A. If the user explicitly asks to create a DPA or BAA template (e.g., "make me a BAA template") outside onboarding, fall back to the standard Create Template flow and create it — collect the parameters from them directly.
 
 **Create PSA if:** they offer professional services, implementation, or consulting
 
@@ -814,7 +817,7 @@ Based on the user's answers, decide which templates to create and what key setti
 - **Liability cap (CSA)**: Default to 1× fees paid in the preceding 12 months — standard for most SaaS.
 - **DPA on CSA**: Do NOT set `include_dpa: true` on the CSA template — the reference requires a URL or attachment to be meaningful, and leaving it blank creates a broken addendum. Instead, create a standalone DPA template. Note in the plan that customers needing a DPA will sign that as a separate agreement.
 - **AI addendum on CSA**: Requires a PDF attachment uploaded first via `POST /v1/attachments`. If the user has an AI addendum PDF during onboarding, upload it and set `include_ai_addendum: true` with `include_ai_addendum_attachment_id` pointing to the returned attachment ID. If not, skip it and include it in the wrap-up to-do list.
-- **Security policy on CSA**: Enable `include_security_policy: true` if they have any certifications. Set the relevant cert flags based on what they listed: `include_security_policy_soc2`, `include_security_policy_soc2_type2`, `include_security_policy_iso27001`, `include_security_policy_hitrust`, `include_security_policy_penetration_testing`, etc. Note: HITRUST is a certification framework; HIPAA is a regulatory requirement — treat them separately.
+- **Security policy on CSA**: Enable `include_security_policy: true` if they have any certifications. **Also set `include_security_policy_include_annual_maintenance: true`** — without this flag, the certifications below won't render on the generated agreement. Then set the relevant cert flags based on what they listed: `include_security_policy_soc2`, `include_security_policy_soc2_type2`, `include_security_policy_iso27001`, `include_security_policy_hitrust`, `include_security_policy_penetration_testing`, etc. Note: HITRUST is a certification framework; HIPAA is a regulatory requirement — treat them separately.
 - **Payment terms**: Default to net-30 (30 days), annual invoicing. Adjust to monthly if they mentioned monthly billing.
 - **Free trial**: Enable on CSA order form if they said yes.
 - **Default signer email**: Use the email from question 3 (signer) on all templates.
@@ -901,6 +904,10 @@ Then display what **cannot be done via the API** and must be completed manually:
 5. **Configure webhooks** — Set up real-time event webhooks (Settings → Integrations).
 6. **Add your AI addendum** — If you have an AI addendum PDF, you can upload it via the skill and link it to your CSA template.
 7. **Preview each template** — Confirm the generated language looks correct before sending live agreements.
+8. **Set up your DPA** *(only if EU customers / personal data processing was indicated)* — DPA configuration (subprocessors, transfer mechanisms, attachments) needs a dedicated Q&A this onboarding flow doesn't cover yet. Set the template up in the app for now, or come back to the skill once a DPA-specific flow exists.
+9. **Set up your BAA** *(only if healthcare customers / PHI was indicated)* — Same situation as the DPA: the right defaults require a dedicated Q&A this onboarding doesn't cover yet.
+
+Only include items 8 and 9 in the actual checklist when the user's onboarding answers triggered them.
 
 **Want to test before going live?** Set `test_agreement: true` on your first send. It sends a real email to the recipient and looks identical to a live agreement, but is marked as not legally binding and doesn't count against your monthly limit. Once you're confident everything looks right, send a live version (without `test_agreement`).
 
