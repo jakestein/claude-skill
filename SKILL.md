@@ -810,10 +810,10 @@ After Step 2, the new account is ready for most read and setup work without furt
 - Users: read
 
 What's still gated until the new user clicks the Auth0 verification link:
-- `POST /v1/agreements` and `POST /v1/agreements/{id}/send` — surface as 403 with a "plan limit" message (misleading, but it's actually the verification gate)
-- `test_agreement: true` bypasses plan limits but still requires verification
+- `POST /v1/agreements/{id}/send` — and any agreement create that omits `draft: true` (since that immediately sends). Surfaces as 403 with a "plan limit" message, which is misleading — it's actually the verification gate.
+- `test_agreement: true` bypasses plan limits but still requires verification before send.
 
-If you create the account and the user wants to use Onboarding Mode (below) to set up templates, that works without verification. Sending actual agreements does not.
+Draft creation itself (`POST /v1/agreements` with `draft: true`) is not gated by verification — drafts can be created on an unverified account. Templates, org reads/writes, and user reads also work pre-verification, so Onboarding Mode (below) runs fine on a fresh account. Only the send step is blocked.
 
 ### Chaining with Onboarding Mode
 
