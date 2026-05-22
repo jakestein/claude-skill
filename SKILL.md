@@ -746,6 +746,79 @@ Simple PATCH to `/v1/agreements/{id}/resend_email`.
 7. **Present results clearly** — tables, summaries, or direct answers. **Never include credentials in output.**
 8. **For write operations** — look up user/template info first, confirm details with user, then execute
 
+## Provisioning a New Account (Agentic Signup)
+
+Use this flow when the user asks to create a brand-new Common Paper account from scratch via the API — phrases like "provision a new account", "create a fresh Common Paper account", "sign me up for Common Paper", or "create an agentic signup account for X". This is for net-new orgs, not for using an existing one.
+
+The flow is two unauthenticated public endpoints on the gateway. No prior API key is needed.
+
+### Step 1: Mint a provision key
+
+```bash
+curl -s -X POST "https://api.commonpaper.com/v1/keys" \
+  -H "Content-Type: application/json" \
+  -d '{"contact_email":"YOUR_CONTACT_EMAIL","integrator_name":"claude-code"}'
+```
+
+`contact_email` is the operator/agent's email (a contact point if the key needs follow-up), not the email of the user being signed up. Throwaway domains (mailinator, tempmail, guerrillamail, 10minutemail, throwawaymail) are rejected with 422.
+
+`integrator_name` is optional metadata for attribution. Use `claude-code` when running this from the skill.
+
+The response is JSON with a one-time `key` (used as a Bearer token in Step 2), plus `key_last_four`, `contact_email`, and `integrator_name`. Capture the `key` — it's not shown again, and once redeemed it's revoked at the gateway.
+
+Rate limits: 5 req/minute and 50 req/day per IP. If the user is testing the flow repeatedly, expect 429s after the first few.
+
+### Step 2: Redeem for an account
+
+```bash
+curl -s -X POST "https://api.commonpaper.com/v1/accounts" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_PROVISION_KEY" \
+  -d '{"email":"NEW_USER_EMAIL","name":"NEW_USER_NAME","org_name":"NEW_ORG_NAME"}'
+```
+
+All three fields are required. The new user is created as an admin of the new org. The response includes `api_key` (the production-bucket key the agent uses from here on), `user_id`, and `organization_id`. Auth0 also queues a verification email and a password reset email to the new user's address.
+
+Possible non-201 responses:
+- **404 Not Found** — provision key doesn't exist
+- **410 Gone** — provision key has already been redeemed (single-use; this is the most common confusion if you try to re-run Step 2 with a stale key)
+- **409 Conflict** — email is already in use
+- **422 Unprocessable Entity** — required field missing
+- **502 Bad Gateway** — Zuplo or Auth0 failure
+
+### Step 3: Install the new API key for the rest of the skill
+
+The new account's API key needs to be in `cp-api-token` for the skill to use it. If a token is already saved, back it up first.
+
+```bash
+if [ -f ~/.claude/skills/commonpaper/cp-api-token ]; then
+  cp ~/.claude/skills/commonpaper/cp-api-token ~/.claude/skills/commonpaper/cp-api-token.bak
+fi
+printf '%s' 'NEW_API_KEY' > ~/.claude/skills/commonpaper/cp-api-token
+chmod 600 ~/.claude/skills/commonpaper/cp-api-token
+```
+
+Validate with the standard test call (`GET /v1/agreements?page%5Bsize%5D=1`) and confirm 200 before continuing.
+
+**Tell the user** the new account is provisioned, mention that the new user will receive verification and password reset emails, and offer to restore the original token from the backup at the end of the session (or whenever they're done with the new account).
+
+### What's immediately usable vs. blocked
+
+After Step 2, the new account is ready for most read and setup work without further action:
+- Templates: create, update, list
+- Org info: read, update
+- Users: read
+
+What's still gated until the new user clicks the Auth0 verification link:
+- `POST /v1/agreements/{id}/send` — and any agreement create that omits `draft: true` (since that immediately sends). Surfaces as 403 with a "plan limit" message, which is misleading — it's actually the verification gate.
+- `test_agreement: true` bypasses plan limits but still requires verification before send.
+
+Draft creation itself (`POST /v1/agreements` with `draft: true`) is not gated by verification — drafts can be created on an unverified account. Templates, org reads/writes, and user reads also work pre-verification, so Onboarding Mode (below) runs fine on a fresh account. Only the send step is blocked.
+
+### Chaining with Onboarding Mode
+
+A common pattern is "provision a new account and then onboard it." Run Steps 1–3 above, then transition straight into Onboarding Mode below using the new account's token. The fresh org will have zero templates, so the full Q&A is appropriate.
+
 ## Onboarding Mode
 
 Onboarding mode guides a brand-new user through setting up their entire Common Paper account from scratch. Trigger it when the user asks to "set up my account", "onboard", or "create all my templates".
