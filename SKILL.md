@@ -85,6 +85,8 @@ For POST/PATCH requests, add:
 GET /v1/agreements
 ```
 
+Paginated — default page size is 15 (override with `page[size]`).
+
 Returns JSONAPI format with pagination metadata:
 ```json
 {
@@ -192,7 +194,7 @@ GET   /v1/agreements/{id}/shareable_link — Get shareable link
 ### Templates
 
 ```
-GET   /v1/templates          — List all templates
+GET   /v1/templates          — List all templates (paginated; default page size 15)
 GET   /v1/templates/{id}     — Get single template
 POST  /v1/templates          — Create a new template
 PATCH /v1/templates/{id}     — Update an existing template
@@ -471,7 +473,7 @@ GET /v1/users               — List organization users
 GET /v1/users/{id}          — Get single user
 GET /v1/agreement_types     — List all agreement types
 GET /v1/agreement_statuses  — List all agreement statuses
-GET /v1/agreement_history   — List agreement histories (filterable)
+GET /v1/agreement_history   — List agreement histories (filterable; paginated; default page size 15)
 ```
 
 ### Organizations
@@ -574,13 +576,18 @@ Internal statuses:
 
 ## Pagination
 
-Index endpoints return pagination metadata in `meta.pagination`:
+These list endpoints are paginated and share the same defaults:
+- `GET /v1/agreements`
+- `GET /v1/templates`
+- `GET /v1/agreement_history`
+
+They return pagination metadata in `meta.pagination`:
 - `records` — total number of matching results (use this for counts!)
 - `current` — current page number
 - `next` — next page number (null if on last page)
 - `last` — last page number
 
-Use `page[number]=N&page[size]=M` query params (URL-encoded: `page%5Bnumber%5D=N&page%5Bsize%5D=M`). Default page size is 25.
+Use `page[number]=N&page[size]=M` query params (URL-encoded: `page%5Bnumber%5D=N&page%5Bsize%5D=M`). Default page size is 15.
 
 **For counting**: Use `page%5Bsize%5D=1` and read `meta.pagination.records` — no need to paginate through all results.
 
