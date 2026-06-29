@@ -784,7 +784,7 @@ curl -s -X POST "https://api.commonpaper.com/v1/accounts" \
   -d '{"email":"NEW_USER_EMAIL","name":"NEW_USER_NAME","org_name":"NEW_ORG_NAME"}'
 ```
 
-All three fields are required. The new user is created as an admin of the new org. The response includes `api_key` (the production-bucket key the agent uses from here on), `user_id`, and `organization_id`. We also queue up two emails to the new user's address: One is a verification email and the other is apassword reset email.
+All three fields are required. The new user is created as an admin of the new org. The response includes `api_key` (the production-bucket key the agent uses from here on), `user_id`, and `organization_id`. We also queue up two emails to the new user's address: One is a verification email and the other is a password reset email.
 
 Possible non-201 responses:
 - **404 Not Found** — provision key doesn't exist
